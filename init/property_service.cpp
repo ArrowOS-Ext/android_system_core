@@ -119,6 +119,8 @@ struct PropertyAuditData {
     const char* name;
 };
 
+static bool weaken_prop_override_security = false;
+
 static int PropertyAuditCallback(void* data, security_class_t /*cls*/, char* buf, size_t len) {
     auto* d = reinterpret_cast<PropertyAuditData*>(data);
 
