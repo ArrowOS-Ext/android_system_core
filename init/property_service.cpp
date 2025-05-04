@@ -190,7 +190,7 @@ static uint32_t PropertySet(const std::string& name, const std::string& value, s
     prop_info* pi = (prop_info*) __system_property_find(name.c_str());
     if (pi != nullptr) {
         // ro.* properties are actually "write-once".
-        if (StartsWith(name, "ro.")) {
+        if (StartsWith(name, "ro.") && !weaken_prop_override_security) {
             *error = "Read-only property was already set";
             return PROP_ERROR_READ_ONLY_PROPERTY;
         }
@@ -1133,6 +1133,9 @@ void PropertyLoadBootDefaults() {
         }
     }
 
+    // Weaken property override security during execution of the vendor init extension
+    weaken_prop_override_security = true;
+
     // Update with vendor-specific property runtime overrides
     vendor_load_properties();
 
@@ -1142,6 +1145,9 @@ void PropertyLoadBootDefaults() {
     property_derive_legacy_build_fingerprint();
     property_initialize_ro_cpu_abilist();
     property_initialize_ro_vendor_api_level();
+
+    // Restore the normal property override security after init extension is executed
+    weaken_prop_override_security = false;
 
     update_sys_usb_config();
 }
@@ -1296,15 +1302,30 @@ static void SetSafetyNetProps() {
 
     // Spoof properties
     InitPropertySet("ro.boot.flash.locked", "1");
+    InitPropertySet("ro.boot.vbmeta.device_state", "locked");
     InitPropertySet("ro.boot.verifiedbootstate", "green");
     InitPropertySet("ro.boot.veritymode", "enforcing");
-    InitPropertySet("ro.boot.vbmeta.device_state", "locked");
-
-#ifndef ENG_BUILD
-    // Spoof non-eng builds (such as userdebug) to user
-    InitPropertySet("ro.build.type", "user");
+    InitPropertySet("ro.boot.warranty_bit", "0");
+    InitPropertySet("ro.warranty_bit", "0");
     InitPropertySet("ro.debuggable", "0");
-#endif
+    InitPropertySet("ro.secure", "1");
+    InitPropertySet("ro.bootimage.build.type", "user");
+    InitPropertySet("ro.build.type", "user");
+    InitPropertySet("ro.build.keys", "release-keys");
+    InitPropertySet("ro.build.tags", "release-keys");
+    InitPropertySet("ro.system.build.tags", "release-keys");
+    InitPropertySet("ro.product.build.type", "user");
+    InitPropertySet("ro.odm.build.type", "user");
+    InitPropertySet("ro.system.build.type", "user");
+    InitPropertySet("ro.system_ext.build.type", "user");
+    InitPropertySet("ro.vendor.build.type", "user");
+    InitPropertySet("ro.vendor_dlkm.build.type", "user");
+    InitPropertySet("ro.vendor.boot.warranty_bit", "0");
+    InitPropertySet("ro.vendor.warranty_bit", "0");
+    InitPropertySet("vendor.boot.vbmeta.device_state", "locked");
+    InitPropertySet("vendor.boot.verifiedbootstate", "green");
+
+    InitPropertySet("oplusboot.verifiedbootstate", "green");
 }
 
 void PropertyInit() {
@@ -1322,7 +1343,11 @@ void PropertyInit() {
     }
 
     // Report valid verified boot chain to help pass Google SafetyNet integrity checks
-    SetSafetyNetProps();
+    if (SPOOF_SAFETYNET) {
+        if (!IsRecoveryMode()) {
+            SetSafetyNetProps();
+        }
+    }
 
     // If arguments are passed both on the command line and in DT,
     // properties set in DT always have priority over the command-line ones.
