@@ -1333,3 +1333,12 @@ on property:persist.device_config.mglru_native.lru_gen_config=core_and_nonleaf_y
   write /sys/kernel/mm/lru_gen/enabled 5
 on property:persist.device_config.mglru_native.lru_gen_config=all
   write /sys/kernel/mm/lru_gen/enabled 7
+
+# Bypass charge
+on property:persist.sys.battery_bypass_charge_support=true && property:persist.sys.bypass_charging_enable=true
+    write /sys/class/power_supply/battery/input_suspend 1
+    write /sys/class/qcom-battery/input_suspend 1
+
+on property:persist.sys.battery_bypass_charge_support=true && property:persist.sys.bypass_charging_enable=false
+    write /sys/class/power_supply/battery/input_suspend 0
+    write /sys/class/qcom-battery/input_suspend 0
